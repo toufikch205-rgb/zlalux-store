@@ -19,8 +19,9 @@
 <section class="benefits"><div><strong>♡ اختيار بعناية</strong><p>منتجات مختارة لستايلك</p></div><div><strong>♧ توصيل داخل الجزائر</strong><p>اختاري البيت أو المكتب</p></div><div><strong>✧ طلب سهل</strong><p>عمّري معلوماتك في ثواني</p></div></section>
 </main><footer id="footer"><strong>Meracel Store</strong><p>STYLE • BEAUTY • ELEGANCE</p><p>© 2026 Meracel Store</p></footer>
 <div class="modalback" id="detailModal"><div class="modal"><button class="close" onclick="closeDetail()">×</button><div id="detail"></div></div></div><div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const products=[
+let products=[
 {id:1,name:'Pink Shoulder Bag',cat:'حقائب',price:4800,old:5500,img:'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=800&q=85',tag:'تخفيض',desc:'حقيبة أنيقة للاستخدام اليومي والمناسبات.'},
 {id:2,name:'Elegant Heels',cat:'أحذية',price:6200,old:0,img:'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=800&q=85',tag:'جديد',desc:'حذاء أنيق يكمل إطلالتك للمناسبات.'},
 {id:3,name:'Soft Pink Dress',cat:'ملابس',price:7900,old:8900,img:'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=800&q=85',tag:'تخفيض',desc:'قطعة أنثوية مستوحاة من أناقة الموسم.'},
@@ -40,11 +41,14 @@ const money=n=>new Intl.NumberFormat('fr-DZ').format(n)+' دج';
 const customKey='meracelCustomProductsV1';
 function getCustomProducts(){try{return JSON.parse(localStorage.getItem(customKey)||'[]')}catch(e){return []}}
 function allProducts(){return [...products,...getCustomProducts()]}
+// قراءة المنتجات الفعالة من قاعدة البيانات المشتركة مع لوحة الإدارة.
+const meracelSB=window.supabase?.createClient("https://ieyyagnghdfjxlxaaxlb.supabase.co","sb_publishable_tkmZLxWRsdiQf5SHxFVrAw_XmaXZt2t");
+async function syncStoreProducts(){if(!meracelSB)return;try{const {data,error}=await meracelSB.from('products').select('*').eq('active',true).order('created_at',{ascending:false});if(error||!data||!data.length)return;products=data.map(p=>({id:String(p.id),name:p.name,cat:p.category||'منتجات',price:Number(p.price)||0,old:Number(p.old_price)||0,img:p.image_url||'https://placehold.co/800x900/f8e9ec/38272c?text=Meracel',tag:p.old_price?'تخفيض':'جديد',desc:p.description||''}));render();const q=new URLSearchParams(location.search);if(q.get('product')){const found=allProducts().find(x=>String(x.id)===q.get('product'));if(found){document.body.classList.add('landing-mode');showProductDetail(found)}}}catch(e){console.warn('Products sync unavailable',e)}}
 function safeB64Encode(obj){const bytes=new TextEncoder().encode(JSON.stringify(obj));let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
 function safeB64Decode(str){try{str=str.replace(/-/g,'+').replace(/_/g,'/');str+='='.repeat((4-str.length%4)%4);const bin=atob(str);const bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));return JSON.parse(new TextDecoder().decode(bytes))}catch(e){return null}}
 function customProductUrl(p){const u=new URL(window.location.href);u.search='';u.hash='';u.searchParams.set('item',safeB64Encode(p));return u.href}
 
-function render(){document.getElementById('grid').innerHTML=allProducts().map(p=>`<article class="product" onclick="showDetail(${p.id})"><img src="${p.img}" alt="${p.name}" loading="lazy"><div class="info"><div class="tag">${p.tag}</div><h3>${p.name}</h3><div class="price">${money(p.price)} ${p.old?`<span class="old">${money(p.old)}</span>`:''}</div><button type="button" onclick="event.stopPropagation();showDetail(${p.id})">تفاصيل وطلب المنتج</button><button class="share-icon" type="button" title="مشاركة المنتج" aria-label="مشاركة المنتج" onclick="event.stopPropagation();shareProduct(${p.id})">↗</button></div></article>`).join('')}
+function render(){document.getElementById('grid').innerHTML=allProducts().map(p=>`<article class="product" onclick="showDetail('${p.id}')"><img src="${p.img}" alt="${p.name}" loading="lazy"><div class="info"><div class="tag">${p.tag}</div><h3>${p.name}</h3><div class="price">${money(p.price)} ${p.old?`<span class="old">${money(p.old)}</span>`:''}</div><button type="button" onclick="event.stopPropagation();showDetail('${p.id}')">تفاصيل وطلب المنتج</button><button class="share-icon" type="button" title="مشاركة المنتج" aria-label="مشاركة المنتج" onclick="event.stopPropagation();shareProduct(${p.id})">↗</button></div></article>`).join('')}
 function showDetail(id){const p=allProducts().find(x=>String(x.id)===String(id));if(!p)return;showProductDetail(p)}
 function showProductDetail(p){
  const wilayaOptions=Object.keys(deliveryPrices).sort((a,b)=>(wilayaArabic[a]||a).localeCompare(wilayaArabic[b]||b,'ar')).map(w=>`<option value="${w}">${wilayaArabic[w]||w}</option>`).join('');
@@ -73,4 +77,5 @@ document.getElementById('detailModal').addEventListener('click',e=>{if(e.target.
 const params=new URLSearchParams(window.location.search);const itemParam=params.get('item');const productParam=params.get('product');
 if(itemParam){const selected=safeB64Decode(itemParam);if(selected&&selected.name&&selected.img){document.body.classList.add('landing-mode');showProductDetail(selected);document.title=selected.name+' | Meracel Store';}else{showToast('رابط المنتج غير صحيح.')}}
 else if(productParam){const selected=allProducts().find(p=>String(p.id)===String(productParam));if(selected){document.body.classList.add('landing-mode');showDetail(selected.id);document.title=selected.name+' | Meracel Store';}else{showToast('رابط المنتج غير موجود.')}}
+syncStoreProducts();
 </script></body></html>
